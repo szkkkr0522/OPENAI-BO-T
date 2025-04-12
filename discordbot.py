@@ -36,9 +36,9 @@ async def on_ready():
 async def on_command_error(ctx, error):
     orig_error = getattr(error, "original", error)
     error_msg = ''.join(traceback.TracebackException.from_exception(orig_error).format())
-    await ctx.send(f"⚠️ エラーが発生しました：\n
+    await ctx.send(f"""⚠️ エラーが発生しました：\n
 {error_msg}
-")
+""")
 
 @bot.command()
 async def ping(ctx):
