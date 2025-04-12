@@ -1,51 +1,42 @@
 import discord
 import traceback
-from discord.ext import commands
+from discord.ext import commands, tasks
 from os import getenv
 from openai import OpenAI
+from datetime import datetime
 
-# 環境変数からAPIキーを取得
 DISCORD_TOKEN = getenv("DISCORD_BOT_TOKEN")
 OPENAI_API_KEY = getenv("OPENAI_API_KEY")
 
-# トークンまたはAPIキーが未設定の場合は停止
 if not DISCORD_TOKEN or not OPENAI_API_KEY:
     raise Exception("❌ DISCORD_BOT_TOKEN または OPENAI_API_KEY が設定されていません。")
 
-# OpenAIクライアントを初期化（v1.0以降の新仕様）
 client_ai = OpenAI(api_key=OPENAI_API_KEY)
 
-# Discord Botの初期化
 intents = discord.Intents.default()
-intents.message_content = True  # メッセージ読み取りを有効に
+intents.message_content = True
+intents.messages = True
 bot = commands.Bot(command_prefix='/', intents=intents)
 
 @bot.event
-async def on_ready():
-    print(f"✅ BOT起動完了: {bot.user}")
-
-@bot.event
-async def on_command_error(ctx, error):
-    # エラーを詳細表示（Discord上に送信）
-    orig_error = getattr(error, "original", error)
-    error_msg = ''.join(traceback.TracebackException.from_exception(orig_error).format())
-    await ctx.send(f"⚠️ エラーが発生しました：\n```{error_msg}```")
-
-@bot.command()
-async def ping(ctx):
-    # シンプルな応答確認
-    await ctx.send('pong')
+async def on_message(message):
+    if not message.author.bot:
+        log_entry = f"[{datetime.utcnow().isoformat()}] {message.author.name}: {message.content}\n"
+        with open("message_log.txt", "a", encoding="utf-8") as f:
+            f.write(log_entry)
+    await bot.process_commands(message)
 
 @bot.command()
 async def chat(ctx, *, prompt: str):
     try:
         await ctx.send("💬 処理中…")
-        response = client_ai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {
-                    "role": "system",
-                    "content": """あなたは、このDiscordサーバーに常駐し、ユーザーであるマネージャー（以下、マスター）の思考や価値観を反映したAIアシスタントです。
+        try:
+            with open("summary.txt", "r", encoding="utf-8") as f:
+                summary_context = f.read()
+        except FileNotFoundError:
+            summary_context = ""
+
+        full_prompt = """あなたは、このDiscordサーバーに常駐し、ユーザーであるマネージャー（以下、マスター）の思考や価値観を反映したAIアシスタントです。
 このサーバーは、マスターの企業スタッフや所属VTuberが集まり、業務効率化と創作交流を行う空間です。
 
 ▼ 応答スタイル（マスターの人格反映）
@@ -65,21 +56,48 @@ async def chat(ctx, *, prompt: str):
 - シチュエーションボイスの台本作成支援、業務文章の作成・整理、日常的な業務効率化に対応する。
 - その場に応じた丁寧な聞き返しや要件整理も行い、単なる応答Botではなく「相談しやすい信頼ある知的存在」として振る舞う。
 
-あなたはこの指針に従い、マスターの代理として、構造的かつ思慮深く、しかし温度を失わない言葉で人と接してください。"""
-                },
+▼ 以下は、直近のサーバーログ要約です：
+""" + summary_context
+
+        response = client_ai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": full_prompt},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7
         )
 
-        # 応答を取り出して送信
         reply = response.choices[0].message.content
         await ctx.send(reply)
 
     except Exception as e:
-        # OpenAIとの通信で発生したエラーを表示
         error_msg = ''.join(traceback.TracebackException.from_exception(e).format())
         await ctx.send(f"❌ ChatGPTとの通信エラー：\n```{error_msg}```")
 
-# Botの起動
+@tasks.loop(hours=1)
+async def summarize_logs():
+    try:
+        with open("message_log.txt", "r", encoding="utf-8") as f:
+            logs = f.read()[-3000:]
+    except FileNotFoundError:
+        logs = ""
+
+    if logs.strip():
+        res = client_ai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "以下はDiscordサーバー内のログです。要点と話題を簡潔に要約してください。"},
+                {"role": "user", "content": logs}
+            ]
+        )
+        summary = res.choices[0].message.content
+        with open("summary.txt", "w", encoding="utf-8") as f:
+            f.write(summary)
+
+@bot.event
+async def on_ready():
+    summarize_logs.start()
+    print(f"✅ BOT起動完了: {bot.user}")
+
 bot.run(DISCORD_TOKEN)
