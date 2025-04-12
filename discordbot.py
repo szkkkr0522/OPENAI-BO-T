@@ -207,10 +207,6 @@ async def chat(ctx, *, prompt: str):
 # - VTuberプロダクション「Fairy」を運営
 # - 少数精鋭体制で企画から制作まで迅速に対応可能
 
-# ==============================
-# End of Prompt
-# ==============================
-
 """
 
             full_reply = client_ai.chat.completions.create(
