@@ -1,20 +1,14 @@
 import discord
 import traceback
 import requests
-import os
 from discord.ext import commands
+from os import getenv
 from openai import OpenAI
 from datetime import datetime
-import mimetypes
 
-# Excel/PDF/Word 読み取りに必要
-import pandas as pd
-from PyPDF2 import PdfReader
-from docx import Document
-
-DISCORD_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-SERPAPI_KEY = os.getenv("SERPAPI_KEY")
+DISCORD_TOKEN = getenv("DISCORD_BOT_TOKEN")
+OPENAI_API_KEY = getenv("OPENAI_API_KEY")
+SERPAPI_KEY = getenv("SERPAPI_KEY")  # 必須：SerpAPIキー
 
 if not DISCORD_TOKEN or not OPENAI_API_KEY or not SERPAPI_KEY:
     raise Exception("❌ 必須のAPIキー（Discord/OpenAI/SerpAPI）が設定されていません。")
@@ -27,6 +21,14 @@ intents.messages = True
 bot = commands.Bot(command_prefix='/', intents=intents)
 
 @bot.event
+async def on_message(message):
+    if not message.author.bot:
+        log_entry = f"[{datetime.utcnow().isoformat()}] {message.channel.name} | {message.author.name}: {message.content}\n"
+        with open("message_log.txt", "a", encoding="utf-8") as f:
+            f.write(log_entry)
+    await bot.process_commands(message)
+
+@bot.event
 async def on_ready():
     print(f"✅ BOT起動完了: {bot.user}")
 
@@ -34,65 +36,9 @@ async def on_ready():
 async def on_command_error(ctx, error):
     orig_error = getattr(error, "original", error)
     error_msg = ''.join(traceback.TracebackException.from_exception(orig_error).format())
-    await ctx.send(f"⚠️ エラーが発生しました：\n```{error_msg}```")
-
-@bot.event
-async def on_message(message):
-    if not message.author.bot:
-        log_entry = f"[{datetime.utcnow().isoformat()}] {message.channel.name} | {message.author.name}: {message.content}\n"
-        with open("message_log.txt", "a", encoding="utf-8") as f:
-            f.write(log_entry)
-
-        # 添付ファイルの処理
-        if message.attachments:
-            for attachment in message.attachments:
-                file_path = f"temp/{attachment.filename}"
-                os.makedirs("temp", exist_ok=True)
-                await attachment.save(file_path)
-
-                mime_type, _ = mimetypes.guess_type(file_path)
-                summary = ""
-
-                try:
-                    if file_path.endswith(".txt"):
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            content = f.read()
-
-                    elif file_path.endswith((".xls", ".xlsx")):
-                        df = pd.read_excel(file_path, sheet_name=None)
-                        content = "\n\n".join(
-                            [f"[{sheet}]\n{df[sheet].to_string(index=False)}" for sheet in df]
-                        )
-
-                    elif file_path.endswith(".pdf"):
-                        reader = PdfReader(file_path)
-                        content = "\n".join(page.extract_text() or "" for page in reader.pages)
-
-                    elif file_path.endswith(".docx"):
-                        doc = Document(file_path)
-                        content = "\n".join(p.text for p in doc.paragraphs)
-
-                    else:
-                        await message.channel.send(f"📁 ファイル形式に対応していません：{attachment.filename}")
-                        continue
-
-                    if content.strip():
-                        ai_response = client_ai.chat.completions.create(
-                            model="gpt-3.5-turbo",
-                            messages=[
-                                {"role": "system", "content": "以下の文書を要約してください。内容のカテゴリや構成の特徴にも触れてください。"},
-                                {"role": "user", "content": content[:10000]}  # 文字数制限
-                            ]
-                        )
-                        summary = ai_response.choices[0].message.content
-                        await message.channel.send(f"📄 ファイル内容の要約：\n{summary}")
-                    else:
-                        await message.channel.send(f"⚠️ ファイルから有効なテキストを抽出できませんでした。")
-
-                except Exception as e:
-                    await message.channel.send(f"❌ ファイル処理中にエラーが発生しました：```{str(e)}```")
-
-    await bot.process_commands(message)
+    await ctx.send(f"⚠️ エラーが発生しました：\n
+{error_msg}
+")
 
 @bot.command()
 async def ping(ctx):
@@ -103,6 +49,7 @@ async def chat(ctx, *, prompt: str):
     try:
         await ctx.send("🤖 入力内容を解析中…")
 
+        # GPTに「検索が必要かどうか」を判定させる
         judge_prompt = f"""
 次のユーザーの発言が、インターネットでの情報検索（Web検索）を必要とする内容かどうかを判定してください。
 情報が一般的・最新ニュース・製品・定義・仕様などであれば「yes」、Botに人格的な相談・創作・表現指導などなら「no」とだけ答えてください。
@@ -120,6 +67,8 @@ async def chat(ctx, *, prompt: str):
 
         if "yes" in judgment:
             await ctx.send("🌐 検索が必要と判断されました。Web検索しています…")
+
+            # Web検索処理（SerpAPI）
             params = {
                 "q": prompt,
                 "api_key": SERPAPI_KEY,
