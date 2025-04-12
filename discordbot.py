@@ -261,8 +261,11 @@ async def chat(ctx, *, prompt: str):
 # ==============================
 # End of Prompt
 # ==============================
+
 """
             
+            """
+
             full_reply = client_ai.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
@@ -276,6 +279,8 @@ async def chat(ctx, *, prompt: str):
 
     except Exception as e:
         error_msg = ''.join(traceback.TracebackException.from_exception(e).format())
-        await ctx.send(f"❌ 処理中にエラーが発生しました：\n```{error_msg}```")
+        await ctx.send(f"❌ 処理中にエラーが発生しました：\n
+{error_msg}
+")
 
 bot.run(DISCORD_TOKEN)
