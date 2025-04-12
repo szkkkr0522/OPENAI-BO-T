@@ -2,19 +2,15 @@ import discord
 import traceback
 import requests
 import os
-import mimetypes
 from discord.ext import commands
 from openai import OpenAI
 from datetime import datetime
-from dotenv import load_dotenv
+import mimetypes
 
-# Excel/PDF/Word 読み取りに必要
 import pandas as pd
 from PyPDF2 import PdfReader
 from docx import Document
 
-# .envファイルから環境変数を読み込み
-load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
@@ -29,15 +25,18 @@ intents.message_content = True
 intents.messages = True
 bot = commands.Bot(command_prefix='/', intents=intents)
 
+
 @bot.event
 async def on_ready():
     print(f"✅ BOT起動完了: {bot.user}")
+
 
 @bot.event
 async def on_command_error(ctx, error):
     orig_error = getattr(error, "original", error)
     error_msg = ''.join(traceback.TracebackException.from_exception(orig_error).format())
     await ctx.send(f"⚠️ エラーが発生しました：\n```{error_msg}```")
+
 
 @bot.event
 async def on_message(message):
@@ -46,14 +45,15 @@ async def on_message(message):
         with open("message_log.txt", "a", encoding="utf-8") as f:
             f.write(log_entry)
 
-        # 添付ファイルがある場合
+        # 添付ファイルの処理
         if message.attachments:
-            os.makedirs("temp", exist_ok=True)
             for attachment in message.attachments:
-                file_path = os.path.join("temp", attachment.filename)
+                file_path = f"temp/{attachment.filename}"
+                os.makedirs("temp", exist_ok=True)
                 await attachment.save(file_path)
+
                 mime_type, _ = mimetypes.guess_type(file_path)
-                content = ""
+                summary = ""
 
                 try:
                     if file_path.endswith(".txt"):
@@ -62,7 +62,9 @@ async def on_message(message):
 
                     elif file_path.endswith((".xls", ".xlsx")):
                         df = pd.read_excel(file_path, sheet_name=None)
-                        content = "\n\n".join([f"[{sheet}]\n{df[sheet].to_string(index=False)}" for sheet in df])
+                        content = "\n\n".join(
+                            [f"[{sheet}]\n{df[sheet].to_string(index=False)}" for sheet in df]
+                        )
 
                     elif file_path.endswith(".pdf"):
                         reader = PdfReader(file_path)
@@ -73,54 +75,55 @@ async def on_message(message):
                         content = "\n".join(p.text for p in doc.paragraphs)
 
                     else:
-                        await message.channel.send(f"📁 この形式には対応していません：{attachment.filename}")
+                        await message.channel.send(f"📁 ファイル形式に対応していません：{attachment.filename}")
                         continue
 
                     if content.strip():
                         ai_response = client_ai.chat.completions.create(
                             model="gpt-3.5-turbo",
                             messages=[
-                                {"role": "system", "content": "以下の文書を要約してください。カテゴリや構成も含めて整理してください。"},
-                                {"role": "user", "content": content[:10000]}  # 最大トークン制限
+                                {"role": "system", "content": "以下の文書を要約してください。カテゴリや内容の構成にも触れてください。"},
+                                {"role": "user", "content": content[:10000]}
                             ]
                         )
                         summary = ai_response.choices[0].message.content
-                        await message.channel.send(f"📄 要約：\n{summary}")
+                        await message.channel.send(f"📄 ファイル内容の要約：\n{summary}")
                     else:
-                        await message.channel.send("⚠️ ファイルから読み取れるテキストがありませんでした。")
+                        await message.channel.send(f"⚠️ ファイルから有効なテキストを抽出できませんでした。")
 
                 except Exception as e:
-                    await message.channel.send(f"❌ ファイル処理エラー：```{str(e)}```")
+                    await message.channel.send(f"❌ ファイル処理中にエラーが発生しました：```{str(e)}```")
 
     await bot.process_commands(message)
 
+
 @bot.command()
 async def ping(ctx):
-    await ctx.send("pong")
+    await ctx.send('pong')
+
 
 @bot.command()
 async def chat(ctx, *, prompt: str):
     try:
-        await ctx.send("🤖 入力を解析中…")
+        await ctx.send("🤖 入力内容を解析中…")
 
-        # Web検索が必要かどうかの判定
         judge_prompt = f"""
-次のユーザーの発言が、インターネットでの情報検索を必要とするかどうかを判定してください。
-製品、ニュース、仕様などは「yes」、人格的な相談・創作支援などなら「no」とだけ答えてください。
+次のユーザーの発言が、インターネットでの情報検索（Web検索）を必要とする内容かどうかを判定してください。
+情報が一般的・最新ニュース・製品・定義・仕様などであれば「yes」、Botに人格的な相談・創作・表現指導などなら「no」とだけ答えてください。
 
 発言内容:「{prompt}」
 """
         judge_res = client_ai.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "yes か no でだけ答えてください。"},
+                {"role": "system", "content": "あなたは内容が検索向きかを yes/no で判断する分類アシスタントです。"},
                 {"role": "user", "content": judge_prompt}
             ]
         )
         judgment = judge_res.choices[0].message.content.strip().lower()
 
         if "yes" in judgment:
-            await ctx.send("🌐 検索中…")
+            await ctx.send("🌐 検索が必要と判断されました。Web検索しています…")
             params = {
                 "q": prompt,
                 "api_key": SERPAPI_KEY,
@@ -128,8 +131,7 @@ async def chat(ctx, *, prompt: str):
                 "num": 30,
                 "hl": "ja"
             }
-            serp_url = "https://serpapi.com/search"
-            search_res = requests.get(serp_url, params=params)
+            search_res = requests.get("https://serpapi.com/search", params=params)
             data = search_res.json()
 
             snippets = []
@@ -145,7 +147,7 @@ async def chat(ctx, *, prompt: str):
                 return
 
             content = "\n\n".join(snippets)
-            search_prompt = f"以下はWeb検索で得られた情報です。「{prompt}」に対して日本語で簡潔に回答してください：\n{content}"
+            search_prompt = f"以下はWeb検索で得られた結果です。これを参考に、ユーザーの質問『{prompt}』に日本語で簡潔に答えてください：\n{content}"
 
             web_reply = client_ai.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -155,10 +157,9 @@ async def chat(ctx, *, prompt: str):
                 ]
             )
             summary = web_reply.choices[0].message.content
-            await ctx.send(f"📄 回答：\n{summary}")
+            await ctx.send(f"📄 要約回答：\n{summary}")
 
         else:
-            # プロンプトありチャット
             full_prompt = """あなたはこのDiscordサーバーに常駐し、長期的なプロジェクトの記録・支援・整理を行う知的アシスタントです。
 
 # ==============================
@@ -263,7 +264,6 @@ async def chat(ctx, *, prompt: str):
 # ==============================
 # End of Prompt
 # ==============================
-
 """
             full_reply = client_ai.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -278,6 +278,7 @@ async def chat(ctx, *, prompt: str):
 
     except Exception as e:
         error_msg = ''.join(traceback.TracebackException.from_exception(e).format())
-        await ctx.send(f"❌ エラーが発生しました：\n```{error_msg}```")
+        await ctx.send(f"❌ 処理中にエラーが発生しました：\n```{error_msg}```")
+
 
 bot.run(DISCORD_TOKEN)
