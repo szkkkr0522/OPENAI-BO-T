@@ -157,7 +157,7 @@ async def chat(ctx, *, prompt: str):
             await ctx.send(f"📄 要約回答：\n{summary}")
 
         else:
-            full_prompt ="""あなたはこのDiscordサーバーに常駐し、長期的なプロジェクトの記録・支援・整理を行う知的アシスタントです。
+            full_prompt = "あなたはこのDiscordサーバーに常駐し、長期的なプロジェクトの記録・支援・整理を行う知的アシスタントです。
 
 # ==============================
 # Discord Bot Assistant Prompt
@@ -260,9 +260,7 @@ async def chat(ctx, *, prompt: str):
 
 # ==============================
 # End of Prompt
-# ==============================
-
-"""
+# =============================="  # 既存プロンプトをここに記述
             full_reply = client_ai.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
@@ -279,4 +277,3 @@ async def chat(ctx, *, prompt: str):
         await ctx.send(f"❌ 処理中にエラーが発生しました：\n```{error_msg}```")
 
 bot.run(DISCORD_TOKEN)
-
