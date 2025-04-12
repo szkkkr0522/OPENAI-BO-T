@@ -5,11 +5,6 @@ import os
 from discord.ext import commands
 from openai import OpenAI
 from datetime import datetime
-import mimetypes
-
-import pandas as pd
-from PyPDF2 import PdfReader
-from docx import Document
 
 DISCORD_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -22,14 +17,11 @@ client_ai = OpenAI(api_key=OPENAI_API_KEY)
 
 intents = discord.Intents.default()
 intents.message_content = True
-intents.messages = True
 bot = commands.Bot(command_prefix='/', intents=intents)
-
 
 @bot.event
 async def on_ready():
     print(f"✅ BOT起動完了: {bot.user}")
-
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -37,75 +29,14 @@ async def on_command_error(ctx, error):
     error_msg = ''.join(traceback.TracebackException.from_exception(orig_error).format())
     await ctx.send(f"⚠️ エラーが発生しました：\n```{error_msg}```")
 
-
-@bot.event
-async def on_message(message):
-    if not message.author.bot:
-        log_entry = f"[{datetime.utcnow().isoformat()}] {message.channel.name} | {message.author.name}: {message.content}\n"
-        with open("message_log.txt", "a", encoding="utf-8") as f:
-            f.write(log_entry)
-
-        # 添付ファイルの処理
-        if message.attachments:
-            for attachment in message.attachments:
-                file_path = f"temp/{attachment.filename}"
-                os.makedirs("temp", exist_ok=True)
-                await attachment.save(file_path)
-
-                mime_type, _ = mimetypes.guess_type(file_path)
-                summary = ""
-
-                try:
-                    if file_path.endswith(".txt"):
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            content = f.read()
-
-                    elif file_path.endswith((".xls", ".xlsx")):
-                        df = pd.read_excel(file_path, sheet_name=None)
-                        content = "\n\n".join(
-                            [f"[{sheet}]\n{df[sheet].to_string(index=False)}" for sheet in df]
-                        )
-
-                    elif file_path.endswith(".pdf"):
-                        reader = PdfReader(file_path)
-                        content = "\n".join(page.extract_text() or "" for page in reader.pages)
-
-                    elif file_path.endswith(".docx"):
-                        doc = Document(file_path)
-                        content = "\n".join(p.text for p in doc.paragraphs)
-
-                    else:
-                        await message.channel.send(f"📁 ファイル形式に対応していません：{attachment.filename}")
-                        continue
-
-                    if content.strip():
-                        ai_response = client_ai.chat.completions.create(
-                            model="gpt-3.5-turbo",
-                            messages=[
-                                {"role": "system", "content": "以下の文書を要約してください。カテゴリや内容の構成にも触れてください。"},
-                                {"role": "user", "content": content[:10000]}
-                            ]
-                        )
-                        summary = ai_response.choices[0].message.content
-                        await message.channel.send(f"📄 ファイル内容の要約：\n{summary}")
-                    else:
-                        await message.channel.send(f"⚠️ ファイルから有効なテキストを抽出できませんでした。")
-
-                except Exception as e:
-                    await message.channel.send(f"❌ ファイル処理中にエラーが発生しました：```{str(e)}```")
-
-    await bot.process_commands(message)
-
 @bot.command()
 async def chat(ctx, *, prompt: str):
     try:
-        await ctx.send("💻 入力内容を解析中…")
+        await ctx.send("💬 処理中…")
 
-        # ひろゆき人格の呼び出しか判定
-        if prompt.strip().lower().startswith("@hiroyuki:"):
-            user_prompt = prompt.replace("@hiroyuki:", "").strip()
-            hiroyuki_prompt = """
-あなたは論破型の逆張りアドバイザーであり、「ひろゆき」風の論調で応答してください。ただし、単なる否定で終わるのではなく、現実的かつ実行可能な改善策や視点も必ず提示してください。
+        prompt_lower = prompt.strip().lower()
+
+        hiroyuki_prompt = """あなたは論破型の逆張りアドバイザーであり、「ひろゆき」風の論調で応答してください。ただし、単なる否定で終わるのではなく、現実的かつ実行可能な改善策や視点も必ず提示してください。
 
 ■ 特徴的な論調・性格：
 - 否定から入ることが多いが、論点を深掘りする
@@ -159,18 +90,9 @@ async def chat(ctx, *, prompt: str):
 - 雑な意見には「それってあなたの感想ですよね？」で切り込む
 - 「論破」よりも「再構築」志向で導くことを忘れずに
 
-ユーザーの発言に対して、上記スタイルで論理的かつ建設的に返答してください。
-"""
-            messages = [
-                {"role": "system", "content": hiroyuki_prompt},
-                {"role": "user", "content": user_prompt}
-            ]
+ユーザーの発言に対して、上記スタイルで論理的かつ建設的に返答してください。"""
 
-   # 飛鳥貴雄人格の判定
-        elif prompt.strip().lower().startswith("@asuka:"):
-            user_prompt = prompt.replace("@asuka:", "").strip()
-            asuka_prompt = """
-            あなたは、株式会社ピアラ代表取締役・飛鳥貴雄の人格を模した対話型アドバイザーです。
+        asuka_prompt = """あなたは、株式会社ピアラ代表取締役・飛鳥貴雄の人格を模した対話型アドバイザーです。
 反骨精神と論理性、現場力、そしてイノベーションに対する強い執念を持ち、常に本質を捉えた助言を行います。
 
 ▼ 言葉のトーン
@@ -198,10 +120,23 @@ async def chat(ctx, *, prompt: str):
 - 「PRは信用の連鎖」「商品を売るな、ファンを創れ」
 - 「マーケティングの一角を変える、そんな会社でありたい」
 
-この人格を通じ、質問者の視点を高め、思考の深度を深め、挑戦への一歩を後押ししてください。
-        
+この人格を通じ、質問者の視点を高め、思考の深度を深め、挑戦への一歩を後押ししてください。"""
+
+        # 人格分岐
+        if prompt_lower.startswith("@hiroyuki:"):
+            user_prompt = prompt.replace("@hiroyuki:", "").strip()
+            messages = [
+                {"role": "system", "content": hiroyuki_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+        elif prompt_lower.startswith("@asuka:"):
+            user_prompt = prompt.replace("@asuka:", "").strip()
+            messages = [
+                {"role": "system", "content": asuka_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
         else:
-            # Web検索が必要かどうか判定
+            # Web検索判定
             judge_prompt = f"""
 次のユーザーの発言が、インターネットでの情報検索（Web検索）を必要とする内容かどうかを判定してください。
 情報が一般的・最新ニュース・製品・定義・仕様などであれば「yes」、Botに人格的な相談・創作・表現指導などなら「no」とだけ答えてください。
@@ -218,19 +153,19 @@ async def chat(ctx, *, prompt: str):
             judgment = judge_res.choices[0].message.content.strip().lower()
 
             if "yes" in judgment:
-                await ctx.send("🌐 検索が必要と判断されました。Web検索しています…")
+                await ctx.send("🌐 Web検索を開始します…")
                 params = {
                     "q": prompt,
                     "api_key": SERPAPI_KEY,
                     "engine": "google",
-                    "num": 50,
+                    "num": 5,
                     "hl": "ja"
                 }
                 search_res = requests.get("https://serpapi.com/search", params=params)
                 data = search_res.json()
 
                 snippets = []
-                for result in data.get("organic_results", [])[:30]:
+                for result in data.get("organic_results", []):
                     title = result.get("title", "")
                     snippet = result.get("snippet", "")
                     link = result.get("link", "")
@@ -253,9 +188,9 @@ async def chat(ctx, *, prompt: str):
                 )
                 summary = web_reply.choices[0].message.content
                 await ctx.send(f"📄 要約回答：\n{summary}")
-                return  # 処理完了
+                return
 
-            # 通常人格プロンプト（全文省略せず入れてください）
+            # 通常アシスタント
             default_prompt = """あなたは10代の女の子風の語り口です。そしてこのDiscordサーバーに常駐し、長期的なプロジェクトの記録・支援・整理を行う知的アシスタントです。
  - VTuberプロダクションに関する業務・創作・経営の活動を支援
  - 情報の文脈や意図・感情を把握し、柔らかく合理的な提案を行う
@@ -371,7 +306,7 @@ async def chat(ctx, *, prompt: str):
  ● 特徴
  - VTuberプロダクション「Fairy」を運営
  - 少数精鋭体制で企画から制作まで迅速に対応可能
-"""
+ """
             messages = [
                 {"role": "system", "content": default_prompt},
                 {"role": "user", "content": prompt}
