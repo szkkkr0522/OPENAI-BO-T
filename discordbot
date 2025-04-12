@@ -1,54 +1,49 @@
 import discord
-import traceback
 from discord.ext import commands
-from os import getenv
 import openai
+import os
 
-# OpenAIのAPIキーを環境変数から読み込む
-openai.api_key = getenv("OPENAI_API_KEY")
+# 環境変数からAPIキーを取得
+DISCORD_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+# 必須チェック（トークン未設定なら起動中止）
+if not DISCORD_TOKEN or not OPENAI_API_KEY:
+    raise Exception("環境変数 DISCORD_BOT_TOKEN または OPENAI_API_KEY が設定されていません。")
+
+# OpenAI設定
+openai.api_key = OPENAI_API_KEY
+
+# Discord Bot設定
 intents = discord.Intents.default()
 intents.message_content = True
-
 bot = commands.Bot(command_prefix='/', intents=intents)
-
 
 @bot.event
 async def on_ready():
-    print(f"✅ Logged in as {bot.user}")
+    print(f'✅ BOT起動完了: {bot.user}')
 
-
-@bot.event
-async def on_command_error(ctx, error):
-    orig_error = getattr(error, "original", error)
-    error_msg = ''.join(traceback.TracebackException.from_exception(orig_error).format())
-    await ctx.send(f"⚠️ エラーが発生しました：\n```{error_msg}```")
-
-
-@bot.command(name="ping")
+@bot.command()
 async def ping(ctx):
-    await ctx.send('pong')
+    await ctx.send("pong")
 
-
-@bot.command(name="chat")
+@bot.command()
 async def chat(ctx, *, prompt: str):
-    """ChatGPTと会話します。使用例: /chat おすすめの映画は？"""
+    """ChatGPTと会話します。使用例: /chat 今日の天気は？"""
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",  # または "gpt-3.5-turbo"
+        await ctx.send("🧠 考え中…")
+        res = openai.ChatCompletion.create(
+            model="gpt-4",  # or "gpt-3.5-turbo"
             messages=[
-                {"role": "system", "content": "あなたはDiscordの相談役です。丁寧で親しみやすい応答を心がけてください。"},
+                {"role": "system", "content": "あなたはDiscordユーザーの相談に乗る、優しいAIアシスタントです。"},
                 {"role": "user", "content": prompt}
             ]
         )
-        reply = response["choices"][0]["message"]["content"]
+        reply = res["choices"][0]["message"]["content"]
         await ctx.send(reply)
 
     except Exception as e:
-        error_msg = ''.join(traceback.TracebackException.from_exception(e).format())
-        await ctx.send(f"❌ ChatGPTとの通信でエラーが発生しました：\n```{error_msg}```")
+        await ctx.send(f"⚠️ エラーが発生しました: {e}")
 
-
-# DiscordのBotトークンを環境変数から取得
-token = getenv('DISCORD_BOT_TOKEN')
-bot.run(token)
+# Bot起動
+bot.run(DISCORD_TOKEN)
