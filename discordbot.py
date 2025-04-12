@@ -36,18 +36,18 @@ async def on_ready():
 async def on_command_error(ctx, error):
     orig_error = getattr(error, "original", error)
     error_msg = ''.join(traceback.TracebackException.from_exception(orig_error).format())
-    await ctx.send(f"⚠️ エラーが発生しました：\n
+    await ctx.send(f"""⚠️ エラーが発生しました：\n
 {error_msg}
-")
+""")
 
 @bot.command()
 async def ping(ctx):
-    await ctx.send('pong')
+    await ctx.send("""pong""")
 
 @bot.command()
 async def chat(ctx, *, prompt: str):
     try:
-        await ctx.send("🤖 入力内容を解析中…")
+        await ctx.send("""🤖 入力内容を解析中…""")
 
         # GPTに「検索が必要かどうか」を判定させる
         judge_prompt = f"""
@@ -66,7 +66,7 @@ async def chat(ctx, *, prompt: str):
         judgment = judge_res.choices[0].message.content.strip().lower()
 
         if "yes" in judgment:
-            await ctx.send("🌐 検索が必要と判断されました。Web検索しています…")
+            await ctx.send("""🌐 検索が必要と判断されました。Web検索しています…""")
 
             # Web検索処理（SerpAPI）
             params = {
@@ -89,7 +89,7 @@ async def chat(ctx, *, prompt: str):
                     snippets.append(f"{title}\n{snippet}\n{link}\n")
 
             if not snippets:
-                await ctx.send("🔍 検索結果が見つかりませんでした。")
+                await ctx.send("""🔍 検索結果が見つかりませんでした。""")
                 return
 
             content = "\n\n".join(snippets)
@@ -103,7 +103,7 @@ async def chat(ctx, *, prompt: str):
                 ]
             )
             summary = web_reply.choices[0].message.content
-            await ctx.send(f"📄 要約回答：\n{summary}")
+            await ctx.send(f"""📄 要約回答：\n{summary}"""")
 
         else:
             full_prompt = """あなたはこのDiscordサーバーに常駐し、長期的なプロジェクトの記録・支援・整理を行う知的アシスタントです。
@@ -222,8 +222,8 @@ async def chat(ctx, *, prompt: str):
 
     except Exception as e:
         error_msg = ''.join(traceback.TracebackException.from_exception(e).format())
-        await ctx.send(f"❌ 処理中にエラーが発生しました：\n
+        await ctx.send(f"""❌ 処理中にエラーが発生しました：\n
 {error_msg}
-")
+""")
 
 bot.run(DISCORD_TOKEN)
