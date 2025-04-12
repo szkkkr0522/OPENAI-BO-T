@@ -1,67 +1,55 @@
+import discord
+import traceback
+import requests
+from discord.ext import commands
+from os import getenv
+from openai import OpenAI
+from datetime import datetime
+
+DISCORD_TOKEN = getenv("DISCORD_BOT_TOKEN")
+OPENAI_API_KEY = getenv("OPENAI_API_KEY")
+SERPAPI_KEY = getenv("SERPAPI_KEY")  # 必須：SerpAPIキー
+
+if not DISCORD_TOKEN or not OPENAI_API_KEY or not SERPAPI_KEY:
+    raise Exception("❌ 必須のAPIキー（Discord/OpenAI/SerpAPI）が設定されていません。")
+
+client_ai = OpenAI(api_key=OPENAI_API_KEY)
+
+intents = discord.Intents.default()
+intents.message_content = True
+intents.messages = True
+bot = commands.Bot(command_prefix='/', intents=intents)
+
+@bot.event
+async def on_message(message):
+    if not message.author.bot:
+        log_entry = f"[{datetime.utcnow().isoformat()}] {message.channel.name} | {message.author.name}: {message.content}\n"
+        with open("message_log.txt", "a", encoding="utf-8") as f:
+            f.write(log_entry)
+    await bot.process_commands(message)
+
+@bot.event
+async def on_ready():
+    print(f"✅ BOT起動完了: {bot.user}")
+
+@bot.event
+async def on_command_error(ctx, error):
+    orig_error = getattr(error, "original", error)
+    error_msg = ''.join(traceback.TracebackException.from_exception(orig_error).format())
+    await ctx.send(f"⚠️ エラーが発生しました：\n
+{error_msg}
+")
+
+@bot.command()
+async def ping(ctx):
+    await ctx.send('pong')
+
 @bot.command()
 async def chat(ctx, *, prompt: str):
     try:
-        await ctx.send("🤖 入力内容を解析中…")
+        await ctx.send("💬 処理中…")
 
-        # GPTに「検索が必要かどうか」を判定させる
-        judge_prompt = f"""
-次のユーザーの発言が、インターネットでの情報検索（Web検索）を必要とする内容かどうかを判定してください。
-情報が一般的・最新ニュース・製品・定義・仕様などであれば「yes」、Botに人格的な相談・創作・表現指導などなら「no」とだけ答えてください。
-
-発言内容:「{prompt}」
-"""
-        judge_res = client_ai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "あなたは内容が検索向きかを yes/no で判断する分類アシスタントです。"},
-                {"role": "user", "content": judge_prompt}
-            ]
-        )
-        judgment = judge_res.choices[0].message.content.strip().lower()
-
-        if "yes" in judgment:
-            await ctx.send("🌐 検索が必要と判断されました。Web検索しています…")
-
-            # Web検索処理（SerpAPI）
-            params = {
-                "q": prompt,
-                "api_key": SERPAPI_KEY,
-                "engine": "google",
-                "num": 30,
-                "hl": "ja"
-            }
-            serp_url = "https://serpapi.com/search"
-            search_res = requests.get(serp_url, params=params)
-            data = search_res.json()
-
-            snippets = []
-            for result in data.get("organic_results", [])[:30]:
-                title = result.get("title", "")
-                snippet = result.get("snippet", "")
-                link = result.get("link", "")
-                if snippet:
-                    snippets.append(f"{title}\n{snippet}\n{link}\n")
-
-            if not snippets:
-                await ctx.send("🔍 検索結果が見つかりませんでした。")
-                return
-
-            content = "\n\n".join(snippets)
-            search_prompt = f"以下はWeb検索で得られた結果です。これを参考に、ユーザーの質問『{prompt}』に日本語で簡潔に答えてください：\n{content}"
-
-            web_reply = client_ai.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "あなたは信頼できるWeb調査アシスタントです。"},
-                    {"role": "user", "content": search_prompt}
-                ]
-            )
-            summary = web_reply.choices[0].message.content
-            await ctx.send(f"📄 要約回答：\n{summary}")
-
-        else:
-            # 通常の人格ベース応答に切り替え
-            full_prompt = """あなたは、このDiscordサーバーに常駐し、ユーザーであるマネージャーの思考や価値観を反映したAIアシスタントです。
+        full_prompt = """あなたは、このDiscordサーバーに常駐し、ユーザーであるマネージャーの思考や価値観を反映したAIアシスタントです。
 このサーバーは、株式会社サイバースターのスタッフや所属VTuberが集まり、業務効率化と創作交流を行う空間です。
 
 ▼ 応答スタイル
@@ -88,19 +76,111 @@ async def chat(ctx, *, prompt: str):
 - その場に応じた丁寧な聞き返しや要件整理も行い、単なる応答Botではなく「相談しやすい信頼ある知的存在」として振る舞う。
 """
 
-            full_reply = client_ai.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": full_prompt},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7
-            )
-            reply = full_reply.choices[0].message.content
-            await ctx.send(reply)
+        response = client_ai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": full_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+
+        reply = response.choices[0].message.content
+        await ctx.send(reply)
 
     except Exception as e:
         error_msg = ''.join(traceback.TracebackException.from_exception(e).format())
-        await ctx.send(f"❌ 処理中にエラーが発生しました：\n```{error_msg}```")
+        await ctx.send(f"❌ ChatGPTとの通信エラー：\n
+{error_msg}
+")
+
+@bot.command()
+async def summarize(ctx, start_date: str, end_date: str):
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+
+        with open("message_log.txt", "r", encoding="utf-8") as f:
+            logs = f.readlines()
+
+        filtered_logs = []
+        for line in logs:
+            if line.startswith("["):
+                ts_str = line.split("]")[0][1:]
+                try:
+                    ts = datetime.fromisoformat(ts_str)
+                    if start <= ts <= end:
+                        filtered_logs.append(line)
+                except ValueError:
+                    continue
+
+        if not filtered_logs:
+            await ctx.send("⚠️ 指定された期間内のログが見つかりませんでした。")
+            return
+
+        prompt = "以下はDiscordでの会話ログです。要点を簡潔にまとめてください：\n" + "".join(filtered_logs)
+
+        res = client_ai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "あなたはログを要約する優秀なアシスタントです。"},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        summary = res.choices[0].message.content
+        await ctx.send(f"📋 要約：\n{summary}")
+
+    except Exception as e:
+        error_msg = ''.join(traceback.TracebackException.from_exception(e).format())
+        await ctx.send(f"❌ 要約中にエラーが発生しました：\n
+{error_msg}
+")
+
+@bot.command()
+async def websearch(ctx, *, query: str):
+    try:
+        await ctx.send(f"🌐 『{query}』をWeb検索しています…")
+
+        params = {
+            "q": query,
+            "api_key": SERPAPI_KEY,
+            "engine": "google",
+            "num": 30,
+            "hl": "ja"
+        }
+        serp_url = "https://serpapi.com/search"
+        search_res = requests.get(serp_url, params=params)
+        data = search_res.json()
+
+        snippets = []
+        for result in data.get("organic_results", [])[:30]:
+            title = result.get("title", "")
+            snippet = result.get("snippet", "")
+            link = result.get("link", "")
+            if snippet:
+                snippets.append(f"{title}\n{snippet}\n{link}\n")
+
+        if not snippets:
+            await ctx.send("🔍 検索結果が見つかりませんでした。")
+            return
+
+        content = "\n\n".join(snippets)
+        prompt = f"以下はWeb検索で得られた結果です。これを参考に、ユーザーの質問『{query}』に日本語で簡潔に答えてください：\n{content}"
+
+        res = client_ai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "あなたは信頼できるWeb調査アシスタントです。"},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        summary = res.choices[0].message.content
+        await ctx.send(f"📄 要約回答：\n{summary}")
+
+    except Exception as e:
+        error_msg = ''.join(traceback.TracebackException.from_exception(e).format())
+        await ctx.send(f"❌ Web検索でエラーが発生しました：\n
+{error_msg}
+")
 
 bot.run(DISCORD_TOKEN)
