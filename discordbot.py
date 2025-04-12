@@ -105,7 +105,7 @@ async def ping(ctx):
 @bot.command()
 async def chat(ctx, *, prompt: str):
     try:
-        await ctx.send("🤖 入力内容を解析中…")
+        await ctx.send("💻 入力内容を解析中…")
 
         judge_prompt = f"""
 次のユーザーの発言が、インターネットでの情報検索（Web検索）を必要とする内容かどうかを判定してください。
@@ -128,7 +128,7 @@ async def chat(ctx, *, prompt: str):
                 "q": prompt,
                 "api_key": SERPAPI_KEY,
                 "engine": "google",
-                "num": 30,
+                "num": 50,
                 "hl": "ja"
             }
             search_res = requests.get("https://serpapi.com/search", params=params)
