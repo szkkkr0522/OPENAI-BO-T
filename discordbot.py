@@ -162,12 +162,11 @@ async def chat(ctx, *, prompt: str):
 @bot.command()
 async def chat(ctx, *, prompt: str):
     try:
-        await ctx.send("🤖 入力内容を解析中…")
+        await ctx.send("💻 入力内容を解析中…")
 
-        # 人格切り替え：ひろゆきモード
-        if prompt.strip().lower().startswith("@chat hiroyuki:"):
+        # ひろゆき人格の呼び出しか判定
+        if prompt.strip().lower().startswith("@hiroyuki:"):
             user_prompt = prompt.replace("@hiroyuki:", "").strip()
-
             hiroyuki_prompt = """
 あなたは論破型の逆張りアドバイザーであり、「ひろゆき」風の論調で応答してください。
 
@@ -192,7 +191,6 @@ async def chat(ctx, *, prompt: str):
                 {"role": "user", "content": user_prompt}
             ]
         else:
-            # 通常の人格（アシスタント）
             default_prompt = """あなたは10代の女の子風の語り口です。そしてこのDiscordサーバーに常駐し、長期的なプロジェクトの記録・支援・整理を行う知的アシスタントです。
  - VTuberプロダクションに関する業務・創作・経営の活動を支援
  - 情報の文脈や意図・感情を把握し、柔らかく合理的な提案を行う
@@ -309,16 +307,18 @@ async def chat(ctx, *, prompt: str):
  - VTuberプロダクション「Fairy」を運営
  - 少数精鋭体制で企画から制作まで迅速に対応可能
 """
-            full_reply = client_ai.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": full_prompt},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7
-            )
-            reply = full_reply.choices[0].message.content
-            await ctx.send(reply)
+            messages = [
+                {"role": "system", "content": default_prompt},
+                {"role": "user", "content": prompt}
+            ]
+
+        full_reply = client_ai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            temperature=0.7
+        )
+        reply = full_reply.choices[0].message.content
+        await ctx.send(reply)
 
     except Exception as e:
         error_msg = ''.join(traceback.TracebackException.from_exception(e).format())
