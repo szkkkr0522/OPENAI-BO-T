@@ -96,69 +96,6 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-
-@bot.command()
-async def ping(ctx):
-    await ctx.send('pong')
-
-
-@bot.command()
-async def chat(ctx, *, prompt: str):
-    try:
-        await ctx.send("💻 入力内容を解析中…")
-
-        judge_prompt = f"""
-次のユーザーの発言が、インターネットでの情報検索（Web検索）を必要とする内容かどうかを判定してください。
-情報が一般的・最新ニュース・製品・定義・仕様などであれば「yes」、Botに人格的な相談・創作・表現指導などなら「no」とだけ答えてください。
-
-発言内容:「{prompt}」
-"""
-        judge_res = client_ai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "あなたは内容が検索向きかを yes/no で判断する分類アシスタントです。"},
-                {"role": "user", "content": judge_prompt}
-            ]
-        )
-        judgment = judge_res.choices[0].message.content.strip().lower()
-
-        if "yes" in judgment:
-            await ctx.send("🌐 検索が必要と判断されました。Web検索しています…")
-            params = {
-                "q": prompt,
-                "api_key": SERPAPI_KEY,
-                "engine": "google",
-                "num": 50,
-                "hl": "ja"
-            }
-            search_res = requests.get("https://serpapi.com/search", params=params)
-            data = search_res.json()
-
-            snippets = []
-            for result in data.get("organic_results", [])[:30]:
-                title = result.get("title", "")
-                snippet = result.get("snippet", "")
-                link = result.get("link", "")
-                if snippet:
-                    snippets.append(f"{title}\n{snippet}\n{link}")
-
-            if not snippets:
-                await ctx.send("🔍 検索結果が見つかりませんでした。")
-                return
-
-            content = "\n\n".join(snippets)
-            search_prompt = f"以下はWeb検索で得られた結果です。これを参考に、ユーザーの質問『{prompt}』に日本語で簡潔に答えてください：\n{content}"
-
-            web_reply = client_ai.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "あなたは信頼できるWeb調査アシスタントです。"},
-                    {"role": "user", "content": search_prompt}
-                ]
-            )
-            summary = web_reply.choices[0].message.content
-            await ctx.send(f"📄 要約回答：\n{summary}")
-
 @bot.command()
 async def chat(ctx, *, prompt: str):
     try:
@@ -190,7 +127,63 @@ async def chat(ctx, *, prompt: str):
                 {"role": "system", "content": hiroyuki_prompt},
                 {"role": "user", "content": user_prompt}
             ]
+
         else:
+            # Web検索が必要かどうか判定
+            judge_prompt = f"""
+次のユーザーの発言が、インターネットでの情報検索（Web検索）を必要とする内容かどうかを判定してください。
+情報が一般的・最新ニュース・製品・定義・仕様などであれば「yes」、Botに人格的な相談・創作・表現指導などなら「no」とだけ答えてください。
+
+発言内容:「{prompt}」
+"""
+            judge_res = client_ai.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "あなたは内容が検索向きかを yes/no で判断する分類アシスタントです。"},
+                    {"role": "user", "content": judge_prompt}
+                ]
+            )
+            judgment = judge_res.choices[0].message.content.strip().lower()
+
+            if "yes" in judgment:
+                await ctx.send("🌐 検索が必要と判断されました。Web検索しています…")
+                params = {
+                    "q": prompt,
+                    "api_key": SERPAPI_KEY,
+                    "engine": "google",
+                    "num": 50,
+                    "hl": "ja"
+                }
+                search_res = requests.get("https://serpapi.com/search", params=params)
+                data = search_res.json()
+
+                snippets = []
+                for result in data.get("organic_results", [])[:30]:
+                    title = result.get("title", "")
+                    snippet = result.get("snippet", "")
+                    link = result.get("link", "")
+                    if snippet:
+                        snippets.append(f"{title}\n{snippet}\n{link}")
+
+                if not snippets:
+                    await ctx.send("🔍 検索結果が見つかりませんでした。")
+                    return
+
+                content = "\n\n".join(snippets)
+                search_prompt = f"以下はWeb検索で得られた結果です。これを参考に、ユーザーの質問『{prompt}』に日本語で簡潔に答えてください：\n{content}"
+
+                web_reply = client_ai.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "あなたは信頼できるWeb調査アシスタントです。"},
+                        {"role": "user", "content": search_prompt}
+                    ]
+                )
+                summary = web_reply.choices[0].message.content
+                await ctx.send(f"📄 要約回答：\n{summary}")
+                return  # 処理完了
+
+            # 通常人格プロンプト（全文省略せず入れてください）
             default_prompt = """あなたは10代の女の子風の語り口です。そしてこのDiscordサーバーに常駐し、長期的なプロジェクトの記録・支援・整理を行う知的アシスタントです。
  - VTuberプロダクションに関する業務・創作・経営の活動を支援
  - 情報の文脈や意図・感情を把握し、柔らかく合理的な提案を行う
