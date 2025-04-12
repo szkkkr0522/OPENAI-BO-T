@@ -1,2 +1,3 @@
-discord.py[voice]
-+openai
+  discord.py[voice]
+
++ openai
