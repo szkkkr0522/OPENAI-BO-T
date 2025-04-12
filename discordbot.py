@@ -40,7 +40,7 @@ async def chat(ctx, *, prompt: str):
     try:
         await ctx.send("💬 ChatGPTに問い合わせ中...")
         response = openai.ChatCompletion.create(
-            model="gpt-4",  # または "gpt-3.5-turbo"
+            model="gpt-3.5-turbo",  # または "gpt-3.5-turbo"
             messages=[
                 {"role": "system", "content": "あなたはユーザーの相談に乗る親しみやすいAIです。"},
                 {"role": "user", "content": prompt}
