@@ -167,7 +167,7 @@ async def chat(ctx, *, prompt: str):
             ]
 
    # 飛鳥貴雄人格の判定
-        if prompt.strip().lower().startswith("@asuka:"):
+        elif prompt.strip().lower().startswith("@asuka:"):
             user_prompt = prompt.replace("@asuka:", "").strip()
             asuka_prompt = """
             あなたは、株式会社ピアラ代表取締役・飛鳥貴雄の人格を模した対話型アドバイザーです。
