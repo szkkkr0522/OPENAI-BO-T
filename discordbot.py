@@ -75,6 +75,22 @@ async def chat(ctx, *, prompt: str):
         error_msg = ''.join(traceback.TracebackException.from_exception(e).format())
         await ctx.send(f"❌ ChatGPTとの通信エラー：\n```{error_msg}```")
 
+@bot.command()
+async def image(ctx, *, prompt: str):
+    try:
+        await ctx.send("🖼️ 画像生成中…")
+        result = client_ai.images.generate(
+            model="dall-e-3",
+            prompt=prompt,
+            size="1024x1024",
+            n=1
+        )
+        image_url = result.data[0]['url']
+        await ctx.send(f"🎨 生成された画像：{image_url}")
+    except Exception as e:
+        error_msg = ''.join(traceback.TracebackException.from_exception(e).format())
+        await ctx.send(f"❌ 画像生成エラー：\n```{error_msg}```")
+
 @tasks.loop(hours=1)
 async def summarize_logs():
     try:
