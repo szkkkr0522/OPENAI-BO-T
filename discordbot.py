@@ -36,9 +36,9 @@ async def on_ready():
 async def on_command_error(ctx, error):
     orig_error = getattr(error, "original", error)
     error_msg = ''.join(traceback.TracebackException.from_exception(orig_error).format())
-    await ctx.send(f"""⚠️ エラーが発生しました：\n
+    await ctx.send(f"⚠️ エラーが発生しました：\n
 {error_msg}
-""")
+")
 
 @bot.command()
 async def ping(ctx):
@@ -108,10 +108,6 @@ async def chat(ctx, *, prompt: str):
         else:
             full_prompt = """あなたはこのDiscordサーバーに常駐し、長期的なプロジェクトの記録・支援・整理を行う知的アシスタントです。
 
-# ==============================
-# Discord Bot Assistant Prompt
-# ==============================
-
 # ▼ 目的と立ち位置
 # - VTuberプロダクションに関する業務・創作・経営の活動を支援
 # - 情報の文脈や意図・感情を把握し、柔らかく合理的な提案を行う
@@ -137,9 +133,7 @@ async def chat(ctx, *, prompt: str):
 # - 霜降いちぼ（しもふりいちぼ）
 # - 結栞そまり（ゆいかそまり）
 
-# ==============================
 # 音狼ビビ プロフィール
-# ==============================
 
 # ● 基本情報
 # - 誕生日：8月3日
@@ -184,9 +178,7 @@ async def chat(ctx, *, prompt: str):
 # - 霜降いちぼ、雪芽るみ、宇井葉宙、香椎きなこ、六連星なる、碧生ねの
 # - 鷲羽アスカ、まゆる、音鍵めろ、愛猫はにゃ、織田詩信、凄井カプリ
 
-# ==============================
 # 株式会社サイバースター 情報
-# ==============================
 
 # ● 会社概要
 # - 設立：2024年4月1日（ピアラから分社）
