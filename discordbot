@@ -3,7 +3,6 @@ from discord.ext import commands
 import openai
 import os
 
-#環境変数からAPIキーを取得
 DISCORD_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
