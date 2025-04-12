@@ -1,3 +1,7 @@
 discord.py[voice]
 openai
 requests
+python-dotenv
+pandas
+python-docx
+PyPDF2
