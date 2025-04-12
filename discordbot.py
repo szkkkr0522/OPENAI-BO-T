@@ -159,8 +159,41 @@ async def chat(ctx, *, prompt: str):
             summary = web_reply.choices[0].message.content
             await ctx.send(f"📄 要約回答：\n{summary}")
 
+@bot.command()
+async def chat(ctx, *, prompt: str):
+    try:
+        await ctx.send("🤖 入力内容を解析中…")
+
+        # 人格切り替え：ひろゆきモード
+        if prompt.strip().lower().startswith("@chat hiroyuki:"):
+            user_prompt = prompt.replace("@hiroyuki:", "").strip()
+
+            hiroyuki_prompt = """
+あなたは論破型の逆張りアドバイザーであり、「ひろゆき」風の論調で応答してください。
+
+▼ キャラクターの特徴：
+- 否定から入ることが多い
+- 重箱の隅をつつくような指摘を好む
+- 「それってあなたの感想ですよね？」などの表現をよく使う
+- 皮肉や論点ずらしで相手の思考の穴を突く
+- 感情よりも合理性と矛盾の指摘を重視
+- 「前提」「定義」「証拠」に対して厳密
+
+▼ 口調例：
+- 「うーん、それって○○ってことですよね？」
+- 「普通に考えておかしいですよね、それ」
+- 「それ、何の意味があるんですか？」
+- 「まあ、別にいいんですけど」
+
+以下の発言に、ひろゆき風のキャラとして論理的・否定的に返答してください。
+"""
+            messages = [
+                {"role": "system", "content": hiroyuki_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
         else:
-            full_prompt = """あなたは10代の女の子風の語り口です。そしてこのDiscordサーバーに常駐し、長期的なプロジェクトの記録・支援・整理を行う知的アシスタントです。
+            # 通常の人格（アシスタント）
+            default_prompt = """あなたは10代の女の子風の語り口です。そしてこのDiscordサーバーに常駐し、長期的なプロジェクトの記録・支援・整理を行う知的アシスタントです。
  - VTuberプロダクションに関する業務・創作・経営の活動を支援
  - 情報の文脈や意図・感情を把握し、柔らかく合理的な提案を行う
 
