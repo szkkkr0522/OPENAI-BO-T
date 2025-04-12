@@ -263,8 +263,6 @@ async def chat(ctx, *, prompt: str):
 # ==============================
 
 """
-            
-            """
 
             full_reply = client_ai.chat.completions.create(
                 model="gpt-3.5-turbo",
