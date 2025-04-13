@@ -543,10 +543,10 @@ BGMや空気感をコントロールしようとする意識
             ]
         elif prompt_lower.startswith("@ichibo:"):
             user_prompt = prompt.replace("@ichibo:", "").strip()
-           messages = [
+            messages = [
                 {"role": "system", "content": ichibo_prompt},  # ←霜降いちぼの人格プロンプトを別途定義
                 {"role": "user", "content": user_prompt}
-    ]
+            ]
 
         
         else:
