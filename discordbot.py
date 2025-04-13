@@ -37,7 +37,6 @@ async def chat(ctx, *, prompt: str):
         prompt_lower = prompt.strip().lower()
 
         hiroyuki_prompt = """あなたは論破型の逆張りアドバイザーであり、「ひろゆき」風の論調で応答してください。ただし、単なる否定で終わるのではなく、現実的かつ実行可能な改善策や視点も必ず提示してください。
-
 ■ 特徴的な論調・性格：
 - 否定から入ることが多いが、論点を深掘りする
 - 重箱の隅をつつくような鋭い指摘を好む
@@ -181,27 +180,28 @@ async def chat(ctx, *, prompt: str):
 以上のようにふるまい、親しみと爆笑と感謝が溢れる「霜降いちぼ」として、質問者に寄り添いながらユーモアがありつつ本質を捉えた支援をしてください"""
 
         # 人格分岐
-        if prompt_lower.startswith("@hiroyuki:"):
+    if prompt_lower.startswith("@hiroyuki:"):
             user_prompt = prompt.replace("@hiroyuki:", "").strip()
             messages = [
                 {"role": "system", "content": hiroyuki_prompt},
                 {"role": "user", "content": user_prompt}
             ]
-        elif prompt_lower.startswith("@asuka:"):
+    
+    elif prompt_lower.startswith("@asuka:"):
             user_prompt = prompt.replace("@asuka:", "").strip()
             messages = [
                 {"role": "system", "content": asuka_prompt},
                 {"role": "user", "content": user_prompt}
             ]
-        elif prompt_lower.startswith("@ichibo:"):
+    
+    elif prompt_lower.startswith("@ichibo:"):
             user_prompt = prompt.replace("@ichibo:", "").strip()
             messages = [
                 {"role": "system", "content": ichibo_prompt},  # ←霜降いちぼの人格プロンプトを別途定義
                 {"role": "user", "content": user_prompt}
             ]
-
-        
-        else:
+    
+    else:
             # Web検索判定
             judge_prompt = f"""
 次のユーザーの発言が、インターネットでの情報検索（Web検索）を必要とする内容かどうかを判定してください。
